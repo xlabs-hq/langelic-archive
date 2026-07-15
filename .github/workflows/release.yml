@@ -23,14 +23,17 @@ jobs:
         # the cross install step to be skipped.
         #
         # The RAR backend compiles rarlab's vendored C++ source via `cc`, so
-        # every target needs a C++ (cross-)toolchain — cross's docker images
-        # and the macOS runners all ship one.
+        # every target needs a C++ toolchain new enough for it. cross's
+        # aarch64 docker image ships a g++ too old for unrar (`ptrdiff_t`
+        # not in scope — missing transitive <cstddef>), so aarch64-linux
+        # builds natively on GitHub's ARM runner instead of via cross. The
+        # musl cross image's g++ is fine.
         job:
           - { target: aarch64-apple-darwin,      os: macos-14 }
           # macos-13 (Intel) is deprecated and stuck queueing indefinitely.
           # macos-15-intel is GitHub's current Intel-darwin runner.
           - { target: x86_64-apple-darwin,       os: macos-15-intel }
-          - { target: aarch64-unknown-linux-gnu, os: ubuntu-22.04, use-cross: true }
+          - { target: aarch64-unknown-linux-gnu, os: ubuntu-22.04-arm }
           - { target: x86_64-unknown-linux-gnu,  os: ubuntu-22.04 }
           - { target: x86_64-unknown-linux-musl, os: ubuntu-22.04, use-cross: true }
 
