@@ -52,7 +52,7 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: Cache Mix deps
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: |
             deps
@@ -62,7 +62,7 @@ jobs:
             mix-${{ runner.os }}-${{ matrix.otp }}-${{ matrix.elixir }}-
 
       - name: Cache Cargo registry
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: |
             ~/.cargo/registry
@@ -70,7 +70,7 @@ jobs:
           key: cargo-registry-${{ runner.os }}-${{ hashFiles('native/langelic_archive/Cargo.lock') }}
 
       - name: Cache Cargo build
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: native/langelic_archive/target
           key: cargo-target-${{ runner.os }}-${{ hashFiles('native/langelic_archive/Cargo.lock', 'native/langelic_archive/src/**') }}
@@ -113,7 +113,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
 
       - name: Cache deps and PLT
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: |
             deps
