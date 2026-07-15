@@ -1,0 +1,36 @@
+[package]
+name = "langelic_archive"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "Rustler NIF for reading ZIP/RAR/7z archives into memory"
+
+[lib]
+crate-type = ["cdylib"]
+
+# rustler_precompiled 0.9 + rustler 0.38 require the crate to expose NIF
+# version features so the release action can pick a target ABI at build time
+# via `--features nif_version_2_XX`. See:
+# https://hexdocs.pm/rustler_precompiled/precompilation_guide.html
+[features]
+default = ["nif_version_2_15"]
+nif_version_2_14 = ["rustler/nif_version_2_14"]
+nif_version_2_15 = ["rustler/nif_version_2_15"]
+nif_version_2_16 = ["rustler/nif_version_2_16"]
+nif_version_2_17 = ["rustler/nif_version_2_17"]
+
+[dependencies]
+rustler = "0.38"
+# ZIP backend. Also covers CBZ.
+zip = "8"
+# RAR backend: safe wrapper around rarlab's vendored unrar C++ source.
+# Extraction/listing only — the unrar license forbids using it to create
+# RAR archives, which we don't do. See NOTICE.
+unrar = "0.5"
+# 7z backend, pure Rust. Maintained fork of sevenz-rust.
+sevenz-rust2 = "0.20"
+
+[profile.release]
+strip = true
+lto = "thin"
+opt-level = 3

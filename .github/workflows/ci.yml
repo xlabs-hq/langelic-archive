@@ -1,0 +1,130 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  MIX_ENV: test
+  # Forces rustler_precompiled to build the NIF from source rather than
+  # downloading a release binary that doesn't yet exist for the PR commit.
+  LANGELIC_ARCHIVE_BUILD: "true"
+
+jobs:
+  test:
+    name: test / ${{ matrix.os }} / OTP ${{ matrix.otp }} / Elixir ${{ matrix.elixir }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Newest supported: OTP 29 needs Elixir 1.20+. Exercises the rustler
+          # 0.38 OTP-29 enif path. The shipped NIF 2.16 artifact forward-loads
+          # on OTP 29's newer NIF ABI, so precompiled users are covered too.
+          - os: ubuntu-latest
+            otp: "29"
+            elixir: "1.20"
+          - os: ubuntu-latest
+            otp: "27"
+            elixir: "1.17"
+          - os: ubuntu-latest
+            otp: "26"
+            elixir: "1.16"
+          - os: macos-latest
+            otp: "27"
+            elixir: "1.17"
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Elixir
+        uses: erlef/setup-beam@v1
+        with:
+          otp-version: ${{ matrix.otp }}
+          elixir-version: ${{ matrix.elixir }}
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Mix deps
+        uses: actions/cache@v5
+        with:
+          path: |
+            deps
+            _build
+          key: mix-${{ runner.os }}-${{ matrix.otp }}-${{ matrix.elixir }}-${{ hashFiles('mix.lock') }}
+          restore-keys: |
+            mix-${{ runner.os }}-${{ matrix.otp }}-${{ matrix.elixir }}-
+
+      - name: Cache Cargo registry
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: cargo-registry-${{ runner.os }}-${{ hashFiles('native/langelic_archive/Cargo.lock') }}
+
+      - name: Cache Cargo build
+        uses: actions/cache@v5
+        with:
+          path: native/langelic_archive/target
+          key: cargo-target-${{ runner.os }}-${{ hashFiles('native/langelic_archive/Cargo.lock', 'native/langelic_archive/src/**') }}
+          restore-keys: |
+            cargo-target-${{ runner.os }}-
+
+      - run: mix deps.get
+
+      - name: Check versions in sync
+        run: bin/check_versions
+
+      - run: mix format --check-formatted
+
+      - run: mix compile --warnings-as-errors
+
+      - run: mix credo --strict
+
+      - run: mix test
+
+      - name: Cargo fmt
+        run: cargo fmt --manifest-path native/langelic_archive/Cargo.toml -- --check
+
+      - name: Cargo clippy
+        run: cargo clippy --manifest-path native/langelic_archive/Cargo.toml --all-targets -- -D warnings
+
+  dialyzer:
+    # Dialyzer on a single matrix cell — it's expensive and redundant across
+    # OTP/Elixir versions.
+    name: dialyzer
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: erlef/setup-beam@v1
+        with:
+          otp-version: "27"
+          elixir-version: "1.17"
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache deps and PLT
+        uses: actions/cache@v5
+        with:
+          path: |
+            deps
+            _build
+            priv/plts
+          key: dialyzer-${{ runner.os }}-otp27-elixir117-${{ hashFiles('mix.exs', 'mix.lock', 'lib/**', 'native/langelic_archive/Cargo.lock', 'native/langelic_archive/src/**') }}
+
+      - run: mix deps.get
+
+      - run: mix compile
+        env:
+          LANGELIC_ARCHIVE_BUILD: "true"
+
+      - run: mix dialyzer --format github
